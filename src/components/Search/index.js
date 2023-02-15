@@ -6,8 +6,11 @@ import HeadlessTippy from '@tippyjs/react/headless';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import classNames from 'classnames/bind';
 
+// import * as request from '~/utils/httpRequest';
 import styles from './Search.module.scss';
 import { SearchIcon } from '~/components/Icons';
+import { useDebounce } from '~/hooks';
+import * as searchServices from '~/services/searchServices';
 
 const cx = classNames.bind(styles);
 
@@ -17,6 +20,8 @@ function Search() {
     const [showResults, setShowResults] = useState(true);
     const [loading, setLoading] = useState(false);
 
+    const debounced = useDebounce(searchValue, 500);
+
     const inputRef = useRef();
 
     useEffect(() => {
@@ -24,17 +29,20 @@ function Search() {
             setSearchResult([]);
             return;
         }
-        setLoading(true);
-        fetch(`https://tiktok.fullstack.edu.vn/api/users/search?q=${encodeURIComponent(searchValue)}&type=less`)
-            .then((res) => res.json())
-            .then((res) => {
-                setSearchResult(res.data);
-                setLoading(false);
-            })
-            .catch(() => {
-                setLoading(false);
-            });
-    }, [searchValue]);
+
+        const fetchApi = async () => {
+            setLoading(true);
+
+            const result = await searchServices.search(debounced);
+            setSearchResult(result);
+
+            setLoading(false);
+        };
+
+        fetchApi();
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [debounced]);
 
     const handleClear = () => {
         setSearchValue('');
@@ -45,10 +53,21 @@ function Search() {
         setShowResults(false);
     };
 
+    const handleChange = (e) => {
+        const searchValue = e.target.value;
+
+        if (!searchValue.startsWith(' ') && searchValue.trim()) {
+            setSearchValue(searchValue);
+        }
+    };
+
+    const handleSubmit = () => {};
+
     return (
         <>
             <HeadlessTippy
                 interactive
+                appendTo={() => document.body}
                 visible={showResults && searchResult.length > 0}
                 render={(attrs) => (
                     <div className={cx('search-result')} tabIndex="-1" {...attrs}>
@@ -68,7 +87,7 @@ function Search() {
                         value={searchValue}
                         spellCheck="false"
                         placeholder="Search accounts and videos"
-                        onChange={(e) => setSearchValue(e.target.value)}
+                        onChange={handleChange}
                     />
 
                     {!!searchValue && !loading && (
@@ -79,7 +98,7 @@ function Search() {
 
                     {loading && <FontAwesomeIcon className={cx('loading')} icon={faSpinner} />}
 
-                    <button className={cx('search-btn')}>
+                    <button className={cx('search-btn')} onClick={handleSubmit}>
                         <SearchIcon />
                     </button>
                 </div>
